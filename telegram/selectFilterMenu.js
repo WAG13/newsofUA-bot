@@ -1,12 +1,13 @@
 import { Keyboard } from "grammy";
-import { KEYBOARD_GO_BACK } from "./menu.js";
+import { t } from "../language/helper.js";
 
-export const createSelectFilterMenu = (titles) => {
+export const createSelectFilterMenu = async (titles, userId) => {
   const keyboard = new Keyboard();
 
+  keyboard.text(await t("go_back", userId)).row();
   titles.forEach((title) => {
     keyboard.text(title).row();
   });
 
-  return keyboard.text(KEYBOARD_GO_BACK).row();
+  return keyboard;
 };

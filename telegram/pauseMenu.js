@@ -1,19 +1,22 @@
 import { replyWithMainMenu } from "./menu.js";
 import { dbApi } from "../mongodb.js";
-import { KEYBOARD_PAUSE, KEYBOARD_RESUME } from "./mainMenu.js";
+import { t } from "../language/helper.js";
 
-export const handlePause = async ({ ctx, isAdmin }) => {
+export const handlePause = async ({ ctx, isAdmin, userId }) => {
   const text = ctx.message.text;
 
   let isPause = false;
-  if (text === KEYBOARD_PAUSE) {
+  if (text === (await t("main_menu.keyboard_pause", userId))) {
     isPause = true;
-  } else if (text === KEYBOARD_RESUME) {
+  } else if (text === (await t("main_menu.keyboard_resume", userId))) {
     isPause = false;
+  } else {
+    return;
   }
+
   const replyText = isPause
-    ? "Надсилання новин призупинено"
-    : "Надсилання новин відновлено";
+    ? await t("pause_menu.resumed", userId)
+    : await t("pause_menu.stopped", userId);
 
   await ctx.reply(replyText);
   await dbApi.updateUserPause(ctx.from.id, isPause);

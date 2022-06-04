@@ -1,6 +1,7 @@
 import { MongoClient } from "mongodb";
+import { RSS_STATUSES } from "./telegram/constants.js";
 
-const url = "mongodb+srv://user:123@cluster0.twnzn.mongodb.net/test";
+const url = "mongodb+srv://user:user@cluster0.twnzn.mongodb.net/test";
 const client = new MongoClient(url);
 
 const dbName = "news";
@@ -13,11 +14,50 @@ export const dbApi = {
     await client.connect();
   },
 
-  async addRSS(rss) {
-    await this.collection.insertOne({
-      _id: rss.link,
-      ...rss,
-    });
+  async handleNewsUpdate(handler) {
+    this.collection.watch().on("change", handler);
+  },
+
+  async addRSS({
+    rssInfo: rss,
+    isAdmin = false,
+    isPrivate = false,
+    users = [],
+  }) {
+    const currentRss = await this.collection.findOne({ _id: rss.link });
+    if (!currentRss) {
+      await this.collection.insertOne({
+        _id: rss.link,
+        ...rss,
+        isPrivate,
+        users,
+      });
+
+      return { rss: currentRss, status: RSS_STATUSES.INSERTED };
+    }
+    if (currentRss.isPrivate) {
+      if (isAdmin) {
+        await this.collection.updateOne(
+          { _id: rss.link },
+          { $set: { isPrivate: false } }
+        );
+        return { rss: currentRss, status: RSS_STATUSES.UPDATED };
+      }
+
+      if (currentRss.users.some((x) => users.includes(x))) {
+        return { rss: currentRss, status: RSS_STATUSES.EXIST };
+      }
+      const newUsers = new Set([...currentRss.users, ...users]);
+      await this.collection.updateOne(
+        {
+          _id: rss.link,
+        },
+        { $set: { users: [...newUsers.values()] } }
+      );
+      return { rss: currentRss, status: RSS_STATUSES.UPDATED };
+    }
+
+    return { rss: currentRss, status: RSS_STATUSES.EXIST };
   },
 
   async getRSSInfo(link) {
@@ -26,6 +66,10 @@ export const dbApi = {
   async getAllRss() {
     return await this.collection.find({}).toArray();
   },
+  async getAllRssWithCategories() {
+    const res = await this.getAllRss();
+    return res.filter((y) => y.categories.length > 1);
+  },
 
   async getAdminIds() {
     return (await this.users.find({}).toArray())
@@ -33,15 +77,31 @@ export const dbApi = {
       .map((user) => user._id);
   },
 
-  async removeRSS(rss) {
-    await this.collection.deleteOne({
-      _id: rss._id,
-    });
-    //TODO: Delete user's news
+  async removeRSS({ rss, isAdmin = false, userId }) {
+    const currentRss = await this.collection.findOne({ _id: rss.link });
+    if (!isAdmin && !currentRss.users.includes(userId)) {
+      return { rss, status: RSS_STATUSES.NOT_ALLOWED };
+    }
+
+    const newUsers = currentRss.users.filter((x) => x !== userId);
+    if (isAdmin || (newUsers.length === 0 && rss.isPrivate)) {
+      await this.collection.deleteOne({
+        _id: rss._id,
+      });
+      return { rss, status: RSS_STATUSES.REMOVED };
+    }
+    await this.collection.updateOne(
+      { _id: rss._id },
+      { $set: { users: newUsers } }
+    );
+    return { rss, status: RSS_STATUSES.UPDATED };
   },
 
   async getUser(userId) {
     return (await this.users.findOne({ _id: userId })) || {};
+  },
+  async getAllUsers() {
+    return await this.users.find({}).toArray();
   },
   async removeUser(userId) {
     await this.users.deleteOne({ _id: userId });
@@ -147,5 +207,8 @@ export const dbApi = {
       },
       { upsert: true }
     );
+  },
+  async updateUserLanguage(userId, language) {
+    await this.users.updateOne({ _id: userId }, { $set: { language } });
   },
 };

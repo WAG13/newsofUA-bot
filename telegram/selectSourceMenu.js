@@ -1,7 +1,8 @@
-import { KEYBOARD_GO_BACK, replyWithSourcesMenu } from "./menu.js";
+import { replyWithSourcesMenu } from "./menu.js";
 import { dbApi } from "../mongodb.js";
 import { DISABLED_SYMBOL, ENABLED_SYMBOL } from "./constants.js";
 import { Keyboard } from "grammy";
+import { t } from "../language/helper.js";
 
 export const parseToggleMessage = (text, news) => {
   if (!text) {
@@ -34,8 +35,10 @@ export const parseToggleMessage = (text, news) => {
   return null;
 };
 
-export const createSelectSourceMenu = (sources) => {
+export const createSelectSourceMenu = async (sources, userId) => {
   const keyboard = new Keyboard();
+
+  keyboard.text(await t("go_back", userId)).row();
 
   sources.forEach((source) => {
     const { name, enabled } = source;
@@ -44,20 +47,22 @@ export const createSelectSourceMenu = (sources) => {
       .row();
   });
 
-  return keyboard.text(KEYBOARD_GO_BACK).row();
+  return keyboard;
 };
 
-export const createSourcesList = (allSources, userSources) => {
-  return allSources.map((source) => {
-    const isUserSource = userSources
-      .map((x) => x.link)
-      .some((userSource) => userSource === source.link);
-    return {
-      name: source.title,
-      link: source.link,
-      enabled: isUserSource,
-    };
-  });
+export const createSourcesList = (allSources, userSources, userId) => {
+  return allSources
+    .filter((x) => x.isPrivate === false || x.users.includes(userId))
+    .map((source) => {
+      const isUserSource = userSources
+        .map((x) => x.link)
+        .some((userSource) => userSource === source.link);
+      return {
+        name: source.title,
+        link: source.link,
+        enabled: isUserSource,
+      };
+    });
 };
 
 export const handleSelectSource = async (ctx) => {
@@ -67,17 +72,18 @@ export const handleSelectSource = async (ctx) => {
   if (!source && enabled === undefined) {
     return;
   }
+  const userId = ctx.from.id;
   const userNews = await dbApi.setEnabledNewsForUser({
     enabled: !enabled,
     link: source,
-    userId: ctx.from.id,
+    userId,
   });
 
   const newsName = news.find((x) => x.link === source).title;
   const textAction = enabled
-    ? `Ви відписались від ${newsName}`
-    : `Ви підписались на ${newsName}`;
-  const sources = createSourcesList(news, userNews);
+    ? await t("sources_menu.you_unsubscribe", userId, { newsName })
+    : await t("sources_menu.you_subscribe", userId, { newsName });
+  const sources = createSourcesList(news, userNews, userId);
   if (!enabled) {
     await dbApi.setUserNewsCategories({
       userId: ctx.from.id,

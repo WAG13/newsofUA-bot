@@ -1,34 +1,39 @@
 import { Keyboard } from "grammy";
-export const KEYBOARD_SELECT_SOURCE = "🌐 Обрати джерела";
-export const KEYBOARD_FILTER_NEWS = "📰 Відфільтрувати новини";
-export const KEYBOARD_PAUSE = "⏸ Призупинити розсилку";
-export const KEYBOARD_RESUME = "▶️ Відновити розсилку";
-export const KEYBOARD_ADD_RSS = "➕ Додати RSS";
-export const KEYBOARD_REMOVE_RSS = "➖ Видалити RSS";
-export const KEYBOARD_ABOUT_BOT = "🤖 Про бота";
-export const KEYBOARD_FEEDBACK = "💬 Відправити відгук";
-export const KEYBOARD_STATS = "📊 Статистика";
-export const KEYBOARD_LIST = "🗄 Мої підписки";
+import { t } from "../language/helper.js";
 
-export const createMainMenu = ({ isAdmin, isPause }) => {
+export const createMainMenu = async ({ isAdmin, isPause, userId }) => {
   const keyboard = new Keyboard()
-    .text(KEYBOARD_SELECT_SOURCE)
-    .row()
-    .text(KEYBOARD_FILTER_NEWS)
+    .text(await t("main_menu.keyboard_select_source", userId))
     .row();
+  keyboard.text(await t("main_menu.keyboard_filter_news", userId)).row();
 
   if (isPause) {
-    keyboard.text(KEYBOARD_RESUME).row();
+    keyboard.text(await t("main_menu.keyboard_resume", userId)).row();
   } else {
-    keyboard.text(KEYBOARD_PAUSE).row();
+    keyboard.text(await t("main_menu.keyboard_pause", userId)).row();
   }
+
+  keyboard
+    .text(await t("main_menu.keyboard_add_rss", userId))
+    .text(await t("main_menu.keyboard_remove_rss", userId))
+    .row();
 
   if (isAdmin) {
-    keyboard.text(KEYBOARD_ADD_RSS).text(KEYBOARD_REMOVE_RSS).row();
+    keyboard
+      .text(await t("main_menu.keyboard_add_admin_rss", userId))
+      .text(await t("main_menu.keyboard_remove_admin_rss", userId))
+      .row();
   }
 
-  keyboard.text(KEYBOARD_LIST).text(KEYBOARD_STATS).row();
-  keyboard.text(KEYBOARD_ABOUT_BOT).text(KEYBOARD_FEEDBACK).row();
+  keyboard
+    .text(await t("main_menu.keyboard_list", userId))
+    .text(await t("main_menu.keyboard_stats", userId))
+    .row();
+  keyboard.text(await t("main_menu.keyboard_language", userId)).row();
+  keyboard
+    .text(await t("main_menu.keyboard_about_bot", userId))
+    .text(await t("main_menu.keyboard_feedback", userId))
+    .row();
 
   return keyboard;
 };

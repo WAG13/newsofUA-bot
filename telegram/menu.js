@@ -4,14 +4,22 @@ import { createSelectFilterMenu } from "./selectFilterMenu.js";
 import { createFeedbackMenu } from "./feedbackMenu.js";
 import { createRssMenu } from "./rssMenu.js";
 import { dbApi } from "../mongodb.js";
-
-export const KEYBOARD_GO_BACK = "🔙 Назад";
+import { t } from "../language/helper.js";
 
 export const replyWithMainMenu = async ({ ctx, isAdmin, isPause }) => {
-  return ctx.reply("Головне меню", {
-    reply_markup: createMainMenu({ isAdmin, isPause }),
+  const userId = ctx.from.id;
+
+  return ctx.reply(await t("main_menu.text", userId), {
+    reply_markup: await createMainMenu({
+      isAdmin,
+      isPause,
+      userId,
+    }),
   });
 };
+
+const MAX_TOP_CATEGORIES_STATS = 5;
+const MAX_TOP_NEWS_STATS = 5;
 
 export const makeHashtag = (hash) =>
   hash.charAt(0) !== "#"
@@ -27,47 +35,119 @@ export const makeHashtag = (hash) =>
         .join("_")
     : hash;
 
-export const replyWithSourcesMenu = async ({
-  ctx,
-  sources,
-  text = "Оберіть інформаційні портали за якими бажаєте слідкувати\n" +
-    "\n" +
-    "Умовні позначення:\n" +
-    "✅ - Ви уже підписані на дане джерело\n" +
-    "❌ - Ви ще не слідкуєта за даним джерелом",
-}) => {
-  await ctx.reply(text, {
-    reply_markup: createSelectSourceMenu(sources),
+export const replyWithSourcesMenu = async ({ ctx, sources, text }) => {
+  const userId = ctx.from.id;
+  await ctx.reply(text || (await t("sources_menu.text", userId)), {
+    reply_markup: await createSelectSourceMenu(sources, userId),
   });
 };
 
 export const replyWithFilterMenu = async (ctx, news) => {
-  await ctx.reply("Оберіть джерело до якого застосовується фільтр", {
-    reply_markup: createSelectFilterMenu(news),
+  const userId = ctx.from.id;
+  await ctx.reply(await t("filter_menu.text", userId), {
+    reply_markup: await createSelectFilterMenu(news, userId),
   });
 };
 
 export const replyWithAboutBot = async ({ ctx, isAdmin, isPause }) => {
+  const userId = ctx.from.id;
+  await ctx.reply(await t("about_bot", userId), {
+    reply_markup: await createMainMenu({ isAdmin, isPause, userId }),
+  });
+};
+
+export const replyWithStats = async ({ ctx, isAdmin, isPause }) => {
+  const users = await dbApi.getAllUsers();
+  const news = await dbApi.getAllRss();
+  const userId = ctx.from.id;
+
+  const newsSubscribeCount = new Map();
+  users
+    .map((x) => x.news)
+    .flat()
+    .map((x) => x.link)
+    .forEach((link) =>
+      newsSubscribeCount.set(link, newsSubscribeCount.get(link) + 1 || 1)
+    );
+
+  const usersCount = users.length;
+  const newsCount = news.length;
+  const sortedNewsSubscribe = [...newsSubscribeCount].sort(
+    (a, b) => b[1] - a[1]
+  );
+
+  const topNews = sortedNewsSubscribe
+    .slice(0, MAX_TOP_NEWS_STATS)
+    .map((x) => x[0]);
+
+  const topNewsCategories = topNews.map((topArticle) => {
+    const articleCategoriesCount = new Map();
+    const allCategories = users
+      .map((x) => x.news)
+      .flat()
+      .filter((x) => x.link === topArticle)
+      .map((x) => x.categories)
+      .flat();
+
+    allCategories.forEach((category) => {
+      articleCategoriesCount.set(
+        category,
+        articleCategoriesCount.get(category) + 1 || 1
+      );
+    });
+
+    return {
+      link: topArticle,
+      categories: [...articleCategoriesCount]
+        .sort((a, b) => b[1] - a[1])
+        .map((x) => x[0]),
+    };
+  });
+
+  const generateTextCategories = async (categories) => {
+    if (categories.length === 0) {
+      return await t("stats.no_category", userId);
+    }
+    return await t("stats.popular_categories", userId, {
+      categories: categories
+        .slice(0, MAX_TOP_CATEGORIES_STATS)
+        .map(makeHashtag)
+        .join(" "),
+    });
+  };
+
+  const getTitle = (link) => news.find((x) => x.link === link)?.title;
+
+  const generateTextTopPortals = async () => {
+    const results = await Promise.all(
+      topNewsCategories.map(
+        async ({ link, categories }, index) =>
+          `${index + 1}. <b><a href="${link}">${getTitle(
+            link
+          )}</a></b> (👥 : <b>${newsSubscribeCount.get(
+            link
+          )}</b>) \n${await generateTextCategories(categories)}`
+      )
+    );
+    return results.join("\n");
+  };
+
   await ctx.reply(
-    "🔹Telegram-бот @newsofUA_bot призначений для агрегування новин із провідних інформаційних порталів. \n" +
-      "\n" +
-      "🔹Користувачу доступні функції вибору джерел інформації та їх фільтрації за категоріями.\n" +
-      "\n" +
-      "🔹Окрім того, користувач має змогу тимчасово призупинити або відновити розсилку новин.",
+    await t("stats.text", userId, {
+      usersCount,
+      newsCount,
+      textTopPortals: await generateTextTopPortals(),
+    }),
     {
-      reply_markup: createMainMenu({ isAdmin, isPause }),
+      reply_markup: await createMainMenu({ isAdmin, isPause, userId }),
+      parse_mode: "HTML",
     }
   );
 };
 
-export const replyWithStats = async ({ ctx, isAdmin, isPause }) => {
-  await ctx.reply("🛠 Скоро додам статистику по найпопулярнішим порталам.", {
-    reply_markup: createMainMenu({ isAdmin, isPause }),
-  });
-};
-
 export const replyWithList = async ({ ctx, isAdmin, isPause }) => {
-  let text = "Ваші підписки:";
+  const userId = ctx.from.id;
+  let text = (await t("subscriptions.your_subs", userId)) + ":";
 
   const user = await dbApi.getUser(ctx.from.id);
   for (const x of user.news) {
@@ -79,30 +159,47 @@ export const replyWithList = async ({ ctx, isAdmin, isPause }) => {
         x.categories.length === 0
           ? text + "\n"
           : text +
-            "\n🔹 Категорії: " +
-            x.categories.map((el) => makeHashtag(el)).join(" ") +
+            `\n🔹 ${await t("subscriptions.categories", userId)}: ` +
+            x.categories.map(makeHashtag).join(" ") +
             "\n";
     }
   }
   await ctx.reply(text, {
-    reply_markup: createMainMenu({ isAdmin, isPause }),
+    reply_markup: await createMainMenu({ isAdmin, isPause, userId }),
   });
 };
 
 export const replyWithFeedback = async (ctx) => {
-  await ctx.reply("Напишіть свій фідбек розробнику", {
-    reply_markup: createFeedbackMenu(),
+  const userId = ctx.from.id;
+  await ctx.reply(await t("feedback_menu.text", userId), {
+    reply_markup: await createFeedbackMenu({ userId }),
   });
 };
 
 export const replyWithAddRss = async (ctx) => {
-  await ctx.reply("Напишіть rss посилання яке необхідно добавити", {
-    reply_markup: createRssMenu(),
+  const userId = ctx.from.id;
+  await ctx.reply(await t("rss_menu.add_rss", userId), {
+    reply_markup: await createRssMenu(userId),
   });
 };
 
 export const replyWithRemoveRss = async (ctx) => {
-  await ctx.reply("Напишіть rss посилання яке необхідно видалити", {
-    reply_markup: createRssMenu(),
+  const userId = ctx.from.id;
+  await ctx.reply(await t("rss_menu.remove_rss", userId), {
+    reply_markup: await createRssMenu(userId),
+  });
+};
+
+export const replyWithAddAdminRss = async (ctx) => {
+  const userId = ctx.from.id;
+  await ctx.reply(await t("rss_menu.add_admin_rss", userId), {
+    reply_markup: await createRssMenu(userId),
+  });
+};
+
+export const replyWithRemoveAdminRss = async (ctx) => {
+  const userId = ctx.from.id;
+  await ctx.reply(await t("rss_menu.remove_admin_rss", userId), {
+    reply_markup: await createRssMenu(userId),
   });
 };

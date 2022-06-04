@@ -1,74 +1,132 @@
 import { Keyboard } from "grammy";
-import { KEYBOARD_GO_BACK, replyWithMainMenu } from "./menu.js";
+import { replyWithMainMenu } from "./menu.js";
 import { getLastArticles, getRSSInfo } from "../services/rss.js";
 import { dbApi } from "../mongodb.js";
-import { handleData, startMonitoring } from "../services/utils.js";
-import { NEWS_INTERVAL } from "../constants.js";
-import { monitorings } from "../index.js";
 import { sendArticleMessage } from "../telegram.js";
-import { STATES } from "./constants.js";
+import { RSS_STATUSES, STATES } from "./constants.js";
+import { t } from "../language/helper.js";
 
-export const createRssMenu = () => {
-  return new Keyboard().text(KEYBOARD_GO_BACK).row();
+export const createRssMenu = async (userId) => {
+  return new Keyboard().text(await t("go_back", userId)).row();
 };
 
 export const handleAddRss = async ({ ctx, isAdmin, isPause }) => {
   const rssLink = ctx.message.text;
+  const userId = ctx.from.id;
   if (!rssLink) {
-    await ctx.reply("Не вказано RSS-стрічки");
+    await ctx.reply(await t("rss_menu.no_text", userId));
     return;
   }
+
   try {
-    console.log(rssLink);
     const rssInfo = await getRSSInfo(rssLink);
-    try {
-      await dbApi.addRSS(rssInfo);
-      console.log(`Start monitoring RSS: ${rssInfo.title}`);
-      const { clear, link } = await startMonitoring({
-        onData: handleData,
-        getLastArticles,
-        interval: NEWS_INTERVAL,
-        link: rssLink,
-        news: await dbApi.getAllRss(),
-      });
-      monitorings.set(link, clear);
-      await ctx.reply(`Додано: ${rssInfo?.title}`);
-      const lastArticle = (await getLastArticles(rssInfo.link))?.[0];
-      await sendArticleMessage({
-        userId: ctx.from.id,
-        article: lastArticle,
-        site: rssInfo?.title,
-        category: lastArticle.category,
-      });
-      await dbApi.setUserState(ctx.from.id, STATES.MAIN_MENU);
-      await replyWithMainMenu({ ctx, isAdmin, isPause });
-    } catch (e) {
-      await ctx.reply("RSS-стрічка уже існує");
+    const { status } = await dbApi.addRSS({
+      rssInfo,
+      isPrivate: true,
+      users: [userId],
+    });
+    if (status === RSS_STATUSES.EXIST) {
+      await ctx.reply(await t("rss_menu.exist", userId));
+      return;
+    } else if (status === RSS_STATUSES.INSERTED) {
+      await ctx.reply(await t("rss_menu.added", userId));
+    } else if (status === RSS_STATUSES.UPDATED) {
+      await ctx.reply(await t("rss_menu.added_private", userId));
     }
+
+    await dbApi.setUserState(ctx.from.id, STATES.MAIN_MENU);
+    await replyWithMainMenu({ ctx, isAdmin, isPause });
   } catch (e) {
     console.log(e);
-    await ctx.reply("Не вдалося завантажити RSS-стрічку");
+    await ctx.reply(await t("rss_menu.failed", userId));
   }
 };
-
 export const handleRemoveRss = async ({ ctx, isAdmin, isPause }) => {
   const rssLink = ctx.message.text;
+  const userId = ctx.from.id;
   if (!rssLink) {
-    await ctx.reply("Не вказано RSS-стрічки");
+    await ctx.reply(await t("rss_menu.no_text", userId));
     return;
   }
 
   const rssInfo = await dbApi.getRSSInfo(rssLink);
   if (!rssInfo) {
-    await ctx.reply("Не знайдено RSS-стрічки");
+    await ctx.reply(await t("rss_menu.not_found", userId));
     return;
   }
 
-  await dbApi.removeRSS(rssInfo);
-  const clearMonitoring = monitorings.get(rssLink);
-  clearMonitoring?.();
-  monitorings.delete(rssLink);
-  await ctx.reply("Стрічку видалено");
+  const { status } = await dbApi.removeRSS({ rss: rssInfo, userId });
+  if (status === RSS_STATUSES.REMOVED) {
+    await ctx.reply(await t("rss_menu.removed", userId));
+  } else if (status === RSS_STATUSES.NOT_ALLOWED) {
+    await ctx.reply(await t("rss_menu.not_allowed", userId));
+  } else if (status === RSS_STATUSES.UPDATED) {
+    await ctx.reply(await t("rss_menu.removed_private", userId));
+  }
+  await dbApi.setUserState(ctx.from.id, STATES.MAIN_MENU);
+  await replyWithMainMenu({ ctx, isAdmin, isPause });
+};
+
+export const handleAddAdminRss = async ({ ctx, isAdmin, isPause }) => {
+  const rssLink = ctx.message.text;
+  const userId = ctx.from.id;
+  if (!rssLink) {
+    await ctx.reply(await t("rss_menu.no_text", userId));
+    return;
+  }
+  try {
+    console.log(rssLink);
+    const rssInfo = await getRSSInfo(rssLink);
+
+    const { status } = await dbApi.addRSS({
+      rssInfo,
+      isAdmin,
+      isPrivate: false,
+    });
+    if (status === RSS_STATUSES.EXIST) {
+      await ctx.reply(await t("rss_menu.exist", userId));
+      return;
+    }
+    if (status === RSS_STATUSES.UPDATED) {
+      await ctx.reply(await t("rss_menu.updated", userId));
+      await dbApi.setUserState(ctx.from.id, STATES.MAIN_MENU);
+      await replyWithMainMenu({ ctx, isAdmin, isPause });
+      return;
+    }
+    await ctx.reply(
+      await t("rss_menu.add_info", userId, { title: rssInfo.title })
+    );
+    const lastArticle = (await getLastArticles(rssInfo.link))?.[0];
+    await sendArticleMessage({
+      userId: ctx.from.id,
+      article: lastArticle,
+      site: rssInfo?.title,
+      category: lastArticle.category,
+    });
+    await dbApi.setUserState(ctx.from.id, STATES.MAIN_MENU);
+    await replyWithMainMenu({ ctx, isAdmin, isPause });
+  } catch (e) {
+    console.log(e);
+    await ctx.reply(await t("rss_menu.failed", userId));
+  }
+};
+
+export const handleRemoveAdminRss = async ({ ctx, isAdmin, isPause }) => {
+  const rssLink = ctx.message.text;
+  const userId = ctx.from.id;
+  if (!rssLink) {
+    await ctx.reply(await t("rss_menu.no_text", userId));
+    return;
+  }
+
+  const rssInfo = await dbApi.getRSSInfo(rssLink);
+  if (!rssInfo) {
+    await ctx.reply(await t("rss_menu.not_found", userId));
+    return;
+  }
+
+  await dbApi.removeRSS({ rss: rssInfo, isAdmin });
+  await ctx.reply(await t("rss_menu.removed", userId));
   await dbApi.setUserState(ctx.from.id, STATES.MAIN_MENU);
   await replyWithMainMenu({ ctx, isAdmin, isPause });
 };

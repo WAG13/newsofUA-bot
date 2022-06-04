@@ -44,20 +44,13 @@ export const handleData = async (newArticles, link) => {
         return;
       }
       const newsPortal = news.find((x) => x.link === link);
-      if (newsPortal.categories.length === 0) {
-        sendArticleMessage({
-          userId: user._id,
-          article: newArticle,
-          site: newsPortal.title,
-          category: newArticle.category,
-        });
-        return;
-      }
-
       const userNewsCategories =
         user.news.find((x) => x.link === link)?.categories || [];
 
-      if (newArticle.category.some((x) => userNewsCategories.includes(x))) {
+      if (
+        newsPortal.categories.length === 0 ||
+        newArticle.category.some((x) => userNewsCategories.includes(x))
+      ) {
         sendArticleMessage({
           userId: user._id,
           article: newArticle,

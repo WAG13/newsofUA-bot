@@ -1,13 +1,7 @@
 import { dbApi } from "../mongodb.js";
-import { KEYBOARD_GO_BACK } from "./menu.js";
 import { Keyboard } from "grammy";
-import {
-  DISABLE_ALL,
-  DISABLED_SYMBOL,
-  ENABLE_ALL,
-  ENABLED_SYMBOL,
-  STATES,
-} from "./constants.js";
+import { DISABLED_SYMBOL, ENABLED_SYMBOL, STATES } from "./constants.js";
+import { t } from "../language/helper.js";
 
 export const parseToggleMessage = (news, text) => {
   if (!text) {
@@ -40,12 +34,15 @@ export const parseToggleMessage = (news, text) => {
   return null;
 };
 
-export const createCategorySourceMenu = (sources) => {
+export const createCategorySourceMenu = async (sources, userId) => {
   const keyboard = new Keyboard();
 
   const rowCondition = (x) => x % 2 === 1;
 
-  keyboard.text(ENABLE_ALL).text(DISABLE_ALL).row();
+  keyboard
+    .text(await t("categories_menu.enable_all", userId))
+    .text(await t("categories_menu.disable_all", userId))
+    .row();
   sources.forEach((source, index) => {
     const { name, enabled } = source;
     keyboard.text(`${enabled ? ENABLED_SYMBOL : DISABLED_SYMBOL} - ${name}`);
@@ -59,7 +56,7 @@ export const createCategorySourceMenu = (sources) => {
     keyboard.row();
   }
 
-  return keyboard.text(KEYBOARD_GO_BACK).row();
+  return keyboard.text(await t("go_back", userId)).row();
 };
 
 export const createCategoriesList = (allCategories, userCategories) => {
@@ -82,9 +79,13 @@ const replyWithCategoryMenu = async ({
   categories,
 }) => {
   const sources = createCategoriesList(allCategories, categories);
-  return ctx.reply(text || `Виберіть категорії для ${source}`, {
-    reply_markup: createCategorySourceMenu(sources),
-  });
+  const userId = ctx.from.id;
+  return ctx.reply(
+    text || (await t("categories_menu.text", userId, { source })),
+    {
+      reply_markup: await createCategorySourceMenu(sources, userId),
+    }
+  );
 };
 
 export const handleSelectCategory = async (ctx, allNews) => {
@@ -113,15 +114,20 @@ export const handleSelectCategory = async (ctx, allNews) => {
 
 export const handleSelectCategorySource = async ({ ctx, categories, news }) => {
   const text = ctx.message.text;
-  if (text === ENABLE_ALL || text === DISABLE_ALL) {
-    const textAction =
-      text === ENABLE_ALL
-        ? "Ви підписалися на всі категорії"
-        : "Ви відписалися зі всіх категорій";
+  const userId = ctx.from.id;
 
-    const categories = text === DISABLE_ALL ? [] : news.categories;
+  const enableAll = await t("categories_menu.enable_all", userId);
+  const disableAll = await t("categories_menu.disable_all", userId);
+
+  if (text === enableAll || text === disableAll) {
+    const textAction =
+      text === enableAll
+        ? await t("categories_menu.you_subscribe_all", userId)
+        : await t("categories_menu.you_unsubscribe_all", userId);
+
+    const categories = text === disableAll ? [] : news.categories;
     const userCategory = await dbApi.setUserNewsCategories({
-      userId: ctx.from.id,
+      userId,
       news: news.link,
       categories,
     });
@@ -144,13 +150,13 @@ export const handleSelectCategorySource = async ({ ctx, categories, news }) => {
   let userCategory;
   if (enabled) {
     userCategory = await dbApi.removeUserNewsCategory({
-      userId: ctx.from.id,
+      userId,
       news: news.link,
       category: source,
     });
   } else {
     userCategory = await dbApi.addUserNewsCategory({
-      userId: ctx.from.id,
+      userId,
       news: news.link,
       category: source,
     });
@@ -160,8 +166,8 @@ export const handleSelectCategorySource = async ({ ctx, categories, news }) => {
   }
 
   const textAction = enabled
-    ? `Ви відписались від ${source}`
-    : `Ви підписались на ${source}`;
+    ? await t("categories_menu.you_unsubscribe", userId, { source })
+    : await t("categories_menu.you_subscribe", userId, { source });
 
   await replyWithCategoryMenu({
     text: textAction,
