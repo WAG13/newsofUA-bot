@@ -1,5 +1,4 @@
 import { XMLParser } from "fast-xml-parser";
-
 import fetch from "node-fetch";
 import { MAX_NEWS_PER_REQUEST } from "../constants.js";
 import {

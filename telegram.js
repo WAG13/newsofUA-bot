@@ -299,7 +299,7 @@ export const sendArticleMessage = async ({
   category,
 }) => {
   const categoryText =
-    category.length === 0 ? `\n\n${category.map(makeHashtag).join(" ")}` : "";
+    category.length !== 0 ? `\n\n${category.map(makeHashtag).join(" ")}` : "";
 
   const sourceText = await t("message.source", userId);
   const message = `${article.text}${categoryText}\n\n<b>${sourceText}: <a href="${article.link}">${site}</a></b>`;

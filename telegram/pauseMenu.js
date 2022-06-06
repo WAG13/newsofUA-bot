@@ -15,8 +15,8 @@ export const handlePause = async ({ ctx, isAdmin, userId }) => {
   }
 
   const replyText = isPause
-    ? await t("pause_menu.resumed", userId)
-    : await t("pause_menu.stopped", userId);
+    ? await t("pause_menu.stopped", userId)
+    : await t("pause_menu.resumed", userId);
 
   await ctx.reply(replyText);
   await dbApi.updateUserPause(ctx.from.id, isPause);
