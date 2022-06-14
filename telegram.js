@@ -338,7 +338,7 @@ export const sendArticleMessage = async ({
       try {
         await bot.api.sendMessage(userId, message, options);
       } catch (e) {
-        console.log("CRITICAL ERROR!", e);
+        console.log("CRITICAL ERROR!");
       }
       return;
     }

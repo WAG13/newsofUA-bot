@@ -5,6 +5,7 @@ import { createFeedbackMenu } from "./feedbackMenu.js";
 import { createRssMenu } from "./rssMenu.js";
 import { dbApi } from "../mongodb.js";
 import { t } from "../language/helper.js";
+import { sendSplitMessage } from "./splitMessage.js";
 
 export const replyWithMainMenu = async ({ ctx, isAdmin, isPause }) => {
   const userId = ctx.from.id;
@@ -21,18 +22,21 @@ export const replyWithMainMenu = async ({ ctx, isAdmin, isPause }) => {
 const MAX_TOP_CATEGORIES_STATS = 5;
 const MAX_TOP_NEWS_STATS = 5;
 
+const replaceChars = (str, chars, replace) => {
+  return str
+    .split("")
+    .map((c) => {
+      if (chars.indexOf(c) > -1) {
+        return replace;
+      }
+      return c;
+    })
+    .join("");
+};
+
 export const makeHashtag = (hash) =>
   hash.charAt(0) !== "#"
-    ? "#" +
-      hash
-        .split(" ")
-        .join("_")
-        .split("/")
-        .join("_")
-        .split(".")
-        .join("_")
-        .split("-")
-        .join("_")
+    ? "#" + replaceChars(replaceChars(hash, " /.-", "_"), ":,()'", "")
     : hash;
 
 export const replyWithSourcesMenu = async ({ ctx, sources, text }) => {
@@ -164,7 +168,7 @@ export const replyWithList = async ({ ctx, isAdmin, isPause }) => {
             "\n";
     }
   }
-  await ctx.reply(text, {
+  await sendSplitMessage(ctx, text, {
     reply_markup: await createMainMenu({ isAdmin, isPause, userId }),
   });
 };

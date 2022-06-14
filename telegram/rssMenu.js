@@ -37,7 +37,10 @@ export const handleAddRss = async ({ ctx, isAdmin, isPause }) => {
     await dbApi.setUserState(ctx.from.id, STATES.MAIN_MENU);
     await replyWithMainMenu({ ctx, isAdmin, isPause });
   } catch (e) {
-    console.log(e);
+    if (e.message === "timeout") {
+      await ctx.reply(await t("rss_menu.failed_timeout", userId));
+      return;
+    }
     await ctx.reply(await t("rss_menu.failed", userId));
   }
 };

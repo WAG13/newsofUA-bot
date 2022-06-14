@@ -37,6 +37,8 @@ export const parseToggleMessage = (news, text) => {
 export const createCategorySourceMenu = async (sources, userId) => {
   const keyboard = new Keyboard();
 
+  keyboard.text(await t("go_back", userId)).row();
+
   const rowCondition = (x) => x % 2 === 1;
 
   keyboard
@@ -56,7 +58,7 @@ export const createCategorySourceMenu = async (sources, userId) => {
     keyboard.row();
   }
 
-  return keyboard.text(await t("go_back", userId)).row();
+  return keyboard;
 };
 
 export const createCategoriesList = (allCategories, userCategories) => {

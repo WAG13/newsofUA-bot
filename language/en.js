@@ -53,19 +53,19 @@ export default {
     remove_rss: "Write rss link where need to remove",
     add_admin_rss: "Write rss link where need to add",
     remove_admin_rss: "Write rss link where need to remove",
-    no_text: "(EN) Не вказано RSS-стрічки",
-    not_found: "(EN) Не знайдено RSS-стрічки",
-    exist: "(EN) RSS-стрічка уже існує",
-    added: "(EN) RSS-стрічка додана",
-    removed: "(EN) Стрічку видалено",
-    removed_private: "(EN) Стрічку видалено (приватна)",
-    not_allowed: "(EN) Не можна видалити стрічку, що не ваша",
-    added_private: "(EN) Стрічка додана (приватна)",
-    failed: "(EN) Не вдалося завантажити RSS-стрічку",
-    updated: "(EN) RSS-стрічка оновлена і тепер вона доступна для всіх",
+    no_text: "No RSS feed specified",
+    not_found: "No RSS feed found",
+    exist: "An RSS feed already exists",
+    added: "RSS feed added",
+    removed: "RSS feed deleted",
+    removed_private: "RSS feed deleted (private)",
+    not_allowed: "You cannot delete a feed that is not yours",
+    added_private: "RSS feed added (private)",
+    failed: "Failed to load RSS feed",
+    updated: "The RSS feed has been updated and is now available to everyone",
     add_info: ({ title }) => `Added: ${title}`,
     no_permission:
-      '❗️ (EN) У вас не вистачає прав. Якщо Ви хочете додати/видалити RSS, то зверніться до адміністраторів (кнопка "Надіслати відгук").',
+      'You do not have permission. If you want to add/remove RSS, please contact the administrators ("Submit Feedback" button).',
   },
   language_menu: {
     text: "Select language",
@@ -74,9 +74,9 @@ export default {
   },
   go_back: "🔙 Back",
   about_bot:
-    "🔹 (EN) MAKE ME ENG PLS :)  Telegram bot @newsofUA_bot призначений для агрегування новин із провідних інформаційних порталів. \n\n" +
-    "🔹Користувачу доступні функції вибору джерел інформації та їх фільтрації за категоріями.\n\n" +
-    "🔹Окрім того, користувач має змогу тимчасово призупинити або відновити розсилку новин.",
+    "🔹Telegram bot @newsofUA_bot is designed to aggregate news from leading information portals. \n\n" +
+    "🔹The user has the ability to select sources of information and filter them by category.\n\n" +
+    "🔹In addition, the user can temporarily suspend or resume sending news.",
   stats: {
     text: ({
       usersCount,

@@ -33,6 +33,7 @@ export const dbApi = {
         users,
       });
 
+      await this.addUserNews(users?.[0], rss.link);
       return { rss: currentRss, status: RSS_STATUSES.INSERTED };
     }
     if (currentRss.isPrivate) {
@@ -54,6 +55,7 @@ export const dbApi = {
         },
         { $set: { users: [...newUsers.values()] } }
       );
+      await this.addUserNews(users?.[0], rss.link);
       return { rss: currentRss, status: RSS_STATUSES.UPDATED };
     }
 
@@ -88,17 +90,38 @@ export const dbApi = {
       await this.collection.deleteOne({
         _id: rss._id,
       });
+      await this.removeUserNews(userId, rss.link);
       return { rss, status: RSS_STATUSES.REMOVED };
     }
     await this.collection.updateOne(
       { _id: rss._id },
       { $set: { users: newUsers } }
     );
+    await this.removeUserNews(userId, rss.link);
     return { rss, status: RSS_STATUSES.UPDATED };
+  },
+
+  async removeUserNews(userId, newsId) {
+    const user = await this.getUser(userId);
+    user.news = user.news.filter((x) => x.link !== newsId);
+    await this.users.updateOne({ _id: userId }, { $set: { news: user.news } });
+  },
+
+  async addUserNews(userId, newsId) {
+    if (!userId) {
+      return;
+    }
+    const user = await this.getUser(userId);
+    const news = await this.getNews(newsId);
+    user.news.push(news);
+    await this.users.updateOne({ _id: userId }, { $set: { news: user.news } });
   },
 
   async getUser(userId) {
     return (await this.users.findOne({ _id: userId })) || {};
+  },
+  async getNews(newsId) {
+    return (await this.collection.findOne({ _id: newsId })) || {};
   },
   async getAllUsers() {
     return await this.users.find({}).toArray();

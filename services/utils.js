@@ -18,6 +18,13 @@ export const normalizeCategories = (categories) => {
   return [
     ...new Set(
       categories
+        .map((x) => {
+          if (typeof x === "object" && !Array.isArray(x) && x !== null) {
+            return x["#text"];
+          }
+          return x;
+        })
+        .filter(Boolean)
         .map((x) => x.split("|"))
         .flat()
         .map((x) => x.trim())
